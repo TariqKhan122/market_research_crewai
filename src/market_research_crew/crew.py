@@ -4,10 +4,25 @@ from crewai import Agent, Crew, LLM, Process, Task
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from typing import List
+
+from pydantic import BaseModel, Field
 from crewai_tools import ScrapeWebsiteTool, SeleniumScrapingTool, TavilySearchTool
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class BusinessResearchReport(BaseModel):
+    """Structured schema for the final business research deliverable."""
+
+    executive_summary: str = Field(description="Concise summary of the research findings.")
+    market_opportunity: str = Field(description="Market size, growth, trends, and opportunity.")
+    competitive_landscape: str = Field(description="Competitors, positioning, pricing, and gaps.")
+    customer_insights: str = Field(description="Target segments, personas, pain points, and demand.")
+    product_strategy: str = Field(description="MVP, differentiation, feasibility, and roadmap.")
+    business_model: str = Field(description="Pricing, revenue model, and go-to-market strategy.")
+    risks_and_mitigations: str = Field(description="Key risks and practical mitigations.")
+    final_recommendation: str = Field(description="Clear go/no-go/conditional recommendation.")
 
 
 def get_groq_llm() -> LLM:
@@ -27,7 +42,7 @@ def get_groq_llm() -> LLM:
         temperature=0.2,
         # Groq's on-demand tier allows 8,000 tokens/minute for this model.
         # A bounded response prevents a single CrewAI request from exhausting it.
-        max_tokens=1000,
+        max_tokens=2500,
     )
 
 # create the tools for the agent
@@ -131,6 +146,7 @@ class MarketResearchCrew():
                      self.competitive_intelligence_task(),
                      self.customer_insights_task(),
                      self.product_strategy_task()],
+            output_pydantic=BusinessResearchReport,
             output_file="reports/report.md"
         )
         
@@ -141,5 +157,8 @@ class MarketResearchCrew():
         return Crew(
             agents=self.agents,
             tasks=self.tasks,
-            process=Process.sequential
+            # Keep the dependency chain deterministic because downstream tasks
+            # consume upstream research as context.
+            process=Process.sequential,
+            verbose=True,
         )
